@@ -6,7 +6,7 @@ Data Mining & Modern AI Systems (IIND4417) — Session 13
 import datetime
 
 TEAM_REGISTRY = {
-    "cohort": "Team 1", # Update with your assigned team number
+    "cohort": "Team 1",
     "repository": "data-mining-202660-team1",
     "members": [
         {
@@ -21,6 +21,7 @@ TEAM_REGISTRY = {
         # Teammates will append their dictionary blocks via their respective branches!
     ]
 }
+
 def display_team_roster():
     print(f"\n{'='*20} {TEAM_REGISTRY['cohort']} ACTIVE ROSTER {'='*20}")
     for m in TEAM_REGISTRY["members"]:
