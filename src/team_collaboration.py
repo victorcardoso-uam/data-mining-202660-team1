@@ -10,12 +10,12 @@ TEAM_REGISTRY = {
     "repository": "data-mining-202660-team1",
     "members": [
         {
-            "name": "Mathéo Durand",
-            "student_id": "N/A",
-            "role": "Data Engineer",
-            "assigned_reviewer": "Michel Haring",
-            "git_feature_branch": "feature/activity-10-matheo-durand",
-            "preferred_ai_assistant": "GitHub Copilot in VS Code",
+            "name": "Lourdes Auais Bulnes",
+            "student_id": "00473471",
+            "role": "Team Member",
+            "assigned_reviewer": "Michel Jakob Häring",
+            "git_feature_branch": "feature/activity-10-lourdes-auais",
+            "preferred_ai_assistant": "Claude",
             "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         # Teammates will append their dictionary blocks via their respective branches!
