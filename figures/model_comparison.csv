@@ -1,0 +1,6 @@
+Model,Features,Train R2,Test R2,Adj R2,MAE,RMSE
+Model 1,solar_irradiance_w_m2,0.952,0.9498,0.9494,16.426,20.263
+Model 2,"solar_irradiance_w_m2, panel_temp_c",0.961,0.9623,0.9617,14.329,17.564
+Model 3,"solar_irradiance_w_m2, panel_temp_c, dust_accumulation_pct",0.9808,0.9756,0.975,11.421,14.13
+Model 4,"solar_irradiance_w_m2, panel_temp_c, dust_accumulation_pct, ambient_temp_c",0.9821,0.976,0.9753,11.26,13.996
+Model 5,"solar_irradiance_w_m2, panel_temp_c, dust_accumulation_pct, ambient_temp_c, wind_speed_m_s, sun_elevation_deg",0.9933,0.9883,0.9877,7.975,9.798
