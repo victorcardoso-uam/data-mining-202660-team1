@@ -144,6 +144,42 @@ plt.xlabel("PC1"); plt.ylabel("PC2")
 plt.tight_layout(); plt.savefig("clusters_pca.png", dpi=120); plt.close()
 
 # ------------------------------------------------------------------
+# 4b. DIAGNOSTICS FOR MILESTONE 2 (silhouette plot + stability check)
+# ------------------------------------------------------------------
+from sklearn.metrics import silhouette_samples, adjusted_rand_score
+
+sil_vals = silhouette_samples(X_scaled, movies["cluster"])
+sil_avg = sil_vals.mean()
+fig, ax = plt.subplots(figsize=(8, 7))
+y_lower = 10
+cmap = plt.get_cmap("tab10")
+for c in range(K):
+    vals = np.sort(sil_vals[movies["cluster"] == c])
+    y_upper = y_lower + len(vals)
+    ax.fill_betweenx(np.arange(y_lower, y_upper), 0, vals,
+                     color=cmap(c), alpha=0.8, label=f"Cluster {c} (n={len(vals)})")
+    y_lower = y_upper + 10
+ax.axvline(sil_avg, color="black", linestyle="--", label=f"Average = {sil_avg:.3f}")
+ax.set_xlabel("Silhouette coefficient")
+ax.set_ylabel("Movies (sorted within each cluster)")
+ax.set_yticks([])
+ax.set_title(f"Silhouette cohesion plot, K-Means k={K}")
+ax.legend(loc="lower right", fontsize=8)
+plt.tight_layout(); plt.savefig("silhouette_plot.png", dpi=120); plt.close()
+
+print("\nAverage silhouette per cluster:")
+print(pd.Series(sil_vals).groupby(movies["cluster"]).mean().round(3).to_string())
+print(f"Share of movies with negative silhouette: {(sil_vals < 0).mean():.1%}")
+
+# Stability: rerun with 10 seeds and compare to the final labels (ARI 1.0 = identical)
+aris = [adjusted_rand_score(
+            movies["cluster"],
+            KMeans(n_clusters=K, n_init=20, random_state=s).fit_predict(X_scaled))
+        for s in range(10)]
+print(f"Stability across 10 seeds: mean ARI = {np.mean(aris):.3f} "
+      f"(min {np.min(aris):.3f})")
+
+# ------------------------------------------------------------------
 # 5. PROFILE EACH CLUSTER
 # ------------------------------------------------------------------
 inv_rating = {v: k for k, v in rating_map.items()}
@@ -195,10 +231,14 @@ for c in range(K):
 summary = pd.DataFrame(summary_rows).merge(profile.reset_index(), on=["cluster", "size"])
 summary.to_csv("cluster_profiles.csv", index=False)
 
-# Fill these in AFTER reading the printed profiles - this is your
-# analysis/conclusion step, so name them based on what you see.
-VIEWER_PERSONAS = {c: f"Persona {c}" for c in range(K)}
-# e.g. VIEWER_PERSONAS = {0: "Family Movie Night", 1: "Prestige Cinephile", ...}
+VIEWER_PERSONAS = {
+    0: "Mature Drama Night Viewer",   # 61% R-rated, drama 73%, modern (median 2003)
+    1: "Classic Film Buff",           # 86% pre-1980, median year 1960, RT 89
+    2: "Easy-Watch Comfort Viewer",   # lowest scores (IMDb 5.4), comedy/family, PG
+    3: "Real-Stories Documentary Fan",# 68% documentaries, most recent (66% post-2010)
+    4: "Auteur Cinema Fan",           # director awards 7x the catalog average
+    5: "Prestige Awards Chaser",      # 100% won a major award, IMDb 7.7
+}
 movies["viewer_profile"] = movies["cluster"].map(VIEWER_PERSONAS)
 
 # Genre heatmap per cluster
