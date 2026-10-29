@@ -24,7 +24,8 @@ from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score
 
 RANDOM_STATE = 42
-DATA_DIR = Path.home() / "Desktop" / "ing" / "sem 9" / "data mining" / "Capstone Project"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = REPO_ROOT / "data" / "raw"
 MOVIES_PATH = DATA_DIR / "HBO_MAX_Content_extended.csv"
 PEOPLE_PATH = DATA_DIR / "People_Dataset.csv"
 
