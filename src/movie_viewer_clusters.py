@@ -28,6 +28,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = REPO_ROOT / "data" / "raw"
 MOVIES_PATH = DATA_DIR / "HBO_MAX_Content_extended.csv"
 PEOPLE_PATH = DATA_DIR / "People_Dataset.csv"
+OUT_DIR = REPO_ROOT / "outputs" / "movie_clusters"
+OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ------------------------------------------------------------------
 # 1. LOAD & CLEAN
@@ -122,7 +124,7 @@ for k in ks:
 fig, ax = plt.subplots(1, 2, figsize=(12, 4))
 ax[0].plot(ks, inertias, "o-"); ax[0].set_title("Elbow method"); ax[0].set_xlabel("k")
 ax[1].plot(ks, sils, "o-"); ax[1].set_title("Silhouette score"); ax[1].set_xlabel("k")
-plt.tight_layout(); plt.savefig("choose_k.png", dpi=120); plt.close()
+plt.tight_layout(); plt.savefig(OUT_DIR / "choose_k.png", dpi=120); plt.close()
 
 # Silhouette alone favors tiny k; for interpretable personas aim for 4-7.
 # Change K after looking at choose_k.png.
@@ -142,7 +144,7 @@ sc = plt.scatter(coords[:, 0], coords[:, 1], c=movies["cluster"], cmap="tab10", 
 plt.legend(*sc.legend_elements(), title="Cluster")
 plt.title(f"Movie clusters (PCA, {pca.explained_variance_ratio_.sum():.0%} variance shown)")
 plt.xlabel("PC1"); plt.ylabel("PC2")
-plt.tight_layout(); plt.savefig("clusters_pca.png", dpi=120); plt.close()
+plt.tight_layout(); plt.savefig(OUT_DIR / "clusters_pca.png", dpi=120); plt.close()
 
 # ------------------------------------------------------------------
 # 4b. DIAGNOSTICS FOR MILESTONE 2 (silhouette plot + stability check)
@@ -166,7 +168,7 @@ ax.set_ylabel("Movies (sorted within each cluster)")
 ax.set_yticks([])
 ax.set_title(f"Silhouette cohesion plot, K-Means k={K}")
 ax.legend(loc="lower right", fontsize=8)
-plt.tight_layout(); plt.savefig("silhouette_plot.png", dpi=120); plt.close()
+plt.tight_layout(); plt.savefig(OUT_DIR / "silhouette_plot.png", dpi=120); plt.close()
 
 print("\nAverage silhouette per cluster:")
 print(pd.Series(sil_vals).groupby(movies["cluster"]).mean().round(3).to_string())
@@ -230,7 +232,7 @@ for c in range(K):
                          "traits": ", ".join(t), "examples": " | ".join(examples)})
 
 summary = pd.DataFrame(summary_rows).merge(profile.reset_index(), on=["cluster", "size"])
-summary.to_csv("cluster_profiles.csv", index=False)
+summary.to_csv(OUT_DIR / "cluster_profiles.csv", index=False)
 
 VIEWER_PERSONAS = {
     0: "Mature Drama Night Viewer",   # 61% R-rated, drama 73%, modern (median 2003)
@@ -250,10 +252,10 @@ plt.xticks(range(len(genre_share.columns)),
            [g.replace("g_", "") for g in genre_share.columns], rotation=60, ha="right")
 plt.colorbar(label="Share of movies in cluster")
 plt.title("Genre composition by cluster")
-plt.tight_layout(); plt.savefig("genre_heatmap.png", dpi=120); plt.close()
+plt.tight_layout(); plt.savefig(OUT_DIR / "genre_heatmap.png", dpi=120); plt.close()
 
 movies[["title", "year", "Genre", "rating", "imdb_score", "cluster", "viewer_profile"]] \
-    .to_csv("movies_with_clusters.csv", index=False)
+    .to_csv(OUT_DIR / "movies_with_clusters.csv", index=False)
 
 # ------------------------------------------------------------------
 # 6. CLASSIFIER: place a new viewer into a profile
@@ -275,5 +277,5 @@ if __name__ == "__main__":
     demo = movies["title"].sample(3, random_state=1).tolist()
     print(f"\nDemo viewer liked: {demo}")
     print("Profile:", classify_viewer(demo))
-    print("\nSaved: choose_k.png, clusters_pca.png, genre_heatmap.png, "
+    print(f"\nSaved to {OUT_DIR}: choose_k.png, clusters_pca.png, genre_heatmap.png, "
           "cluster_profiles.csv, movies_with_clusters.csv")

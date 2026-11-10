@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 
-SOLAR_DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "regression_team1_solar.csv"
+SOLAR_DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "raw" / "regression_team1_solar.csv"
 solar_data = pd.read_csv(SOLAR_DATA_PATH)
 
 cat > activity16_regression.py << 'EOF'

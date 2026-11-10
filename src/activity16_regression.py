@@ -1,10 +1,16 @@
+from pathlib import Path
+
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 
-df = pd.read_csv("data/regression_team1_solar.csv")
+REPO_ROOT = Path(__file__).resolve().parent.parent
+FIG_DIR = REPO_ROOT / "figures" / "activity16_regression"
+FIG_DIR.mkdir(parents=True, exist_ok=True)
+
+df = pd.read_csv(REPO_ROOT / "data" / "raw" / "regression_team1_solar.csv")
 print(df.shape)
 print(df.isna().sum())
 print(df.describe().T)
@@ -60,7 +66,7 @@ os.makedirs("figures", exist_ok=True)
 table = pd.DataFrame(results)
 print("\n=== MODEL COMPARISON ===")
 print(table.to_string(index=False))
-table.to_csv("figures/model_comparison.csv", index=False)
+table.to_csv(FIG_DIR / "model_comparison.csv", index=False)
 
 def residual_plots(name, fit):
     model, X_te, y_te, pred = fit
@@ -73,7 +79,7 @@ def residual_plots(name, fit):
     stats.probplot(resid, dist="norm", plot=ax[1])
     ax[1].set_title(f"{name}: Normal Q-Q")
     fig.tight_layout()
-    fname = f"figures/residuals_{name.replace(' ', '_').lower()}.png"
+    fname = FIG_DIR / f"residuals_{name.replace(' ', '_').lower()}.png"
     fig.savefig(fname, dpi=150)
     print(f"saved {fname} | Shapiro-Wilk p = {stats.shapiro(resid).pvalue:.4f}")
 
