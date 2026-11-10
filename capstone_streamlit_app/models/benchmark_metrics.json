@@ -1,0 +1,44 @@
+{
+  "classifiers": [
+    {
+      "Model": "Decision Tree (CART)",
+      "Family": "Classical",
+      "Train Accuracy": 0.8194112967382657,
+      "Test Accuracy": 0.7936507936507936,
+      "Precision (macro)": 0.8539906134980368,
+      "Recall (macro)": 0.8255167938657398,
+      "F1 (macro)": 0.8280270386142307,
+      "ROC-AUC (OvR)": 0.9426614203974718,
+      "5-fold CV F1": 0.8350290554309374
+    },
+    {
+      "Model": "Logistic Regression",
+      "Family": "Classical",
+      "Train Accuracy": 0.9968178202068417,
+      "Test Accuracy": 0.9619047619047619,
+      "Precision (macro)": 0.960039873490166,
+      "Recall (macro)": 0.9613496249413971,
+      "F1 (macro)": 0.9595229242559932,
+      "ROC-AUC (OvR)": 0.9988002141659013,
+      "5-fold CV F1": 0.9555640307547737
+    },
+    {
+      "Model": "Neural Network (MLP)",
+      "Family": "Neural Network",
+      "Train Accuracy": 0.9817024661893397,
+      "Test Accuracy": 0.9396825396825397,
+      "Precision (macro)": 0.9306983685954683,
+      "Recall (macro)": 0.9452380204686869,
+      "F1 (macro)": 0.9365732452669983,
+      "ROC-AUC (OvR)": 0.9976985005392454,
+      "5-fold CV F1": 0.9406813191079955
+    }
+  ],
+  "kmeans": {
+    "k": 6,
+    "silhouette": 0.13002731105680215,
+    "inertia": 12297.873947166016,
+    "stability_mean_ari": 0.9688760412604637,
+    "stability_min_ari": 0.9080680063959093
+  }
+}
