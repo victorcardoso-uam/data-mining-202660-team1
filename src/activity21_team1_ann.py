@@ -10,7 +10,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPRegressor
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 
-df = pd.read_csv("ann_team1_solar.csv")
+df = pd.read_csv("data/raw/ann_team1_solar.csv")
 target = "power_output_kw"
 X = df.drop(columns=[target])
 y = df[target]
