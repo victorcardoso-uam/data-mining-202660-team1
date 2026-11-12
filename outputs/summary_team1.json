@@ -1,0 +1,20 @@
+{
+  "best": "Model 3 (Deep 2-Layer Net)",
+  "unscaled_r2": 0.9973577432600892,
+  "unscaled_epochs": 413,
+  "n_train": 560,
+  "n_test": 140,
+  "features": [
+    "solar_irradiance_w_m2",
+    "ambient_temp_c",
+    "panel_temp_c",
+    "wind_speed_m_s",
+    "sun_elevation_deg",
+    "dust_accumulation_pct",
+    "inverter_efficiency"
+  ],
+  "y_mean": 213.9448714285714,
+  "y_std": 117.21289991412273,
+  "y_min": 0.0,
+  "y_max": 438.51
+}
