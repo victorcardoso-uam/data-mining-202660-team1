@@ -1,4 +1,0 @@
-Model,R2,Adjusted R2,MAE,RMSE
-Baseline OLS Linear,0.992803,0.992421,7.360116,9.104911
-Log-Transformed Target OLS,0.947381,0.944587,19.734143,24.619360
-Polynomial Regression Degree 2,0.992666,0.990513,7.448583,9.191593
