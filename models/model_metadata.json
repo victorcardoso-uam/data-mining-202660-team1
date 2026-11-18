@@ -16,8 +16,13 @@
     "Train R2": 0.9860091471414608,
     "Test R2": 0.9811465348386349,
     "Test Adj R2": 0.9801454658920138,
+<<<<<<< HEAD
     "Test MAE (kW)": 11.127783241566545,
     "Test RMSE (kW)": 14.73673078426628
+=======
+    "Test MAE (kW)": 11.127783241566549,
+    "Test RMSE (kW)": 14.736730784266285
+>>>>>>> origin/exam/partial-exam-2
   },
   "feature_ranges": {
     "solar_irradiance_w_m2": [
