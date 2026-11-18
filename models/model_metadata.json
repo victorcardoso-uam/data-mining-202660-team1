@@ -1,0 +1,56 @@
+{
+  "model": "MLPRegressor(64, 32, relu, early_stopping=True)",
+  "features": [
+    "solar_irradiance_w_m2",
+    "ambient_temp_c",
+    "panel_temp_c",
+    "wind_speed_m_s",
+    "dust_accumulation_pct",
+    "inverter_efficiency"
+  ],
+  "target": "power_output_kw",
+  "epochs": 796,
+  "best_val_epoch": 796,
+  "n_params": 2561,
+  "metrics": {
+    "Train R2": 0.9860091471414608,
+    "Test R2": 0.9811465348386349,
+    "Test Adj R2": 0.9801454658920138,
+    "Test MAE (kW)": 11.127783241566545,
+    "Test RMSE (kW)": 14.73673078426628
+  },
+  "feature_ranges": {
+    "solar_irradiance_w_m2": [
+      202.0,
+      1099.8
+    ],
+    "ambient_temp_c": [
+      15.0,
+      42.0
+    ],
+    "panel_temp_c": [
+      21.5,
+      74.8
+    ],
+    "wind_speed_m_s": [
+      1.0,
+      15.0
+    ],
+    "dust_accumulation_pct": [
+      0.1,
+      34.9
+    ],
+    "inverter_efficiency": [
+      0.88,
+      0.98
+    ]
+  },
+  "feature_medians": {
+    "solar_irradiance_w_m2": 671.4000000000001,
+    "ambient_temp_c": 29.0,
+    "panel_temp_c": 48.0,
+    "wind_speed_m_s": 7.75,
+    "dust_accumulation_pct": 18.1,
+    "inverter_efficiency": 0.933
+  }
+}
