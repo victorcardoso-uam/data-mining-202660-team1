@@ -543,9 +543,13 @@ with tab5:
                                                 st.session_state.chat[-10:])
                         except Exception as e:
                             resp = getattr(e, "response", None)
-                            detail = (f"HTTP {resp.status_code}: {resp.text[:300]}" if resp is not None
-                                      else type(e).__name__)
-                            answer = f"⚠️ The assistant could not reach the LLM. {detail}"
+                            if resp is not None and resp.status_code in ai.RETRYABLE:
+                                answer = ("⏳ The AI model is busy right now (the provider is overloaded). "
+                                          "I retried a few times; please ask again in a minute.")
+                            else:
+                                detail = (f"HTTP {resp.status_code}: {resp.text[:300]}" if resp is not None
+                                          else type(e).__name__)
+                                answer = f"⚠️ The assistant could not reach the LLM. {detail}"
                     st.markdown(answer)
                 st.session_state.chat.append({"role": "assistant", "content": answer})
 

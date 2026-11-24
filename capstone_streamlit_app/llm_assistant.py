@@ -15,6 +15,7 @@ Providers (set in .streamlit/secrets.toml or environment variables):
 
 import os
 import re
+import time
 
 import numpy as np
 import pandas as pd
@@ -39,6 +40,12 @@ def label(col):
 # -----------------------------------------------------------------------------
 # Provider configuration
 # -----------------------------------------------------------------------------
+def _as_list(v):
+    if isinstance(v, (list, tuple)):
+        return [str(x).strip() for x in v if str(x).strip()]
+    return [x.strip() for x in str(v or "").split(",") if x.strip()]
+
+
 def get_config(secrets):
     """Read provider settings from st.secrets first, then environment variables."""
     def get(key, default=None):
@@ -55,10 +62,12 @@ def get_config(secrets):
     if provider == "anthropic":
         return {"provider": "anthropic", "api_key": get("ANTHROPIC_API_KEY"),
                 "model": get("LLM_MODEL", "claude-haiku-5-5"),
+                "fallbacks": _as_list(get("LLM_FALLBACK_MODELS", "")),
                 "base_url": get("ANTHROPIC_BASE_URL", "https://api.anthropic.com")}
     if provider == "openai":
         return {"provider": "openai", "api_key": get("OPENAI_API_KEY", ""),
                 "model": get("LLM_MODEL", "gpt-4o-mini"),
+                "fallbacks": _as_list(get("LLM_FALLBACK_MODELS", "")),
                 "base_url": get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")}
     return None
 
@@ -72,14 +81,16 @@ def is_ready(cfg):
     return bool(cfg["api_key"]) or "localhost" in cfg["base_url"] or "127.0.0.1" in cfg["base_url"]
 
 
-def ask_llm(cfg, system, messages, max_tokens=700, timeout=60):
-    """Send the chat to the configured provider and return the answer text."""
+RETRYABLE = {429, 500, 502, 503, 504, 529}  # rate limit / overloaded / temporary server errors
+
+
+def _ask_once(cfg, model, system, messages, max_tokens, timeout):
     if cfg["provider"] == "anthropic":
         r = requests.post(
             f"{cfg['base_url'].rstrip('/')}/v1/messages",
             headers={"x-api-key": cfg["api_key"], "anthropic-version": "2023-06-01",
                      "content-type": "application/json"},
-            json={"model": cfg["model"], "max_tokens": max_tokens, "temperature": 0.2,
+            json={"model": model, "max_tokens": max_tokens, "temperature": 0.2,
                   "system": system, "messages": messages},
             timeout=timeout)
         r.raise_for_status()
@@ -90,11 +101,36 @@ def ask_llm(cfg, system, messages, max_tokens=700, timeout=60):
         headers["authorization"] = f"Bearer {cfg['api_key']}"
     r = requests.post(
         f"{cfg['base_url']}/chat/completions", headers=headers,
-        json={"model": cfg["model"], "max_tokens": max_tokens, "temperature": 0.2,
+        json={"model": model, "max_tokens": max_tokens, "temperature": 0.2,
               "messages": [{"role": "system", "content": system}] + messages},
         timeout=timeout)
     r.raise_for_status()
     return r.json()["choices"][0]["message"]["content"]
+
+
+def ask_llm(cfg, system, messages, max_tokens=700, timeout=60, retries=3):
+    """Send the chat to the provider and return the answer text.
+
+    When the provider is busy (HTTP 429/5xx) it waits and retries (2 s, 4 s, ...), then moves on to
+    the backup models listed in LLM_FALLBACK_MODELS. Other errors (bad key, unknown model) stop at once.
+    """
+    last_error = None
+    for model in [cfg["model"]] + cfg.get("fallbacks", []):
+        for attempt in range(retries):
+            try:
+                return _ask_once(cfg, model, system, messages, max_tokens, timeout)
+            except requests.HTTPError as e:
+                last_error = e
+                status = e.response.status_code if e.response is not None else None
+                if status not in RETRYABLE:
+                    raise
+                if attempt < retries - 1:
+                    time.sleep(2 * (attempt + 1))
+            except (requests.ConnectionError, requests.Timeout) as e:
+                last_error = e
+                if attempt < retries - 1:
+                    time.sleep(2 * (attempt + 1))
+    raise last_error
 
 
 # -----------------------------------------------------------------------------
