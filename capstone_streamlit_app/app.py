@@ -147,12 +147,6 @@ st.sidebar.markdown(
     "**Data:** HBO Max movie catalog + People awards dataset")
 
 llm_cfg = ai.get_config(st.secrets)
-st.sidebar.divider()
-st.sidebar.subheader("💬 AI Assistant")
-if ai.is_ready(llm_cfg):
-    st.sidebar.success(f"Connected · {llm_cfg['model']}")
-else:
-    st.sidebar.warning("No LLM key set. See the AI Assistant tab.")
 
 active_model = classifiers[model_name]
 active_row = perf_df[perf_df["Model"] == model_name].iloc[0]
@@ -548,8 +542,10 @@ with tab5:
                             answer = ai.ask_llm(llm_cfg, ai.SYSTEM_PROMPT.format(facts=facts),
                                                 st.session_state.chat[-10:])
                         except Exception as e:
-                            answer = f"⚠️ The assistant could not reach the LLM ({type(e).__name__}). " \
-                                     "Check the API key and internet connection."
+                            resp = getattr(e, "response", None)
+                            detail = (f"HTTP {resp.status_code}: {resp.text[:300]}" if resp is not None
+                                      else type(e).__name__)
+                            answer = f"⚠️ The assistant could not reach the LLM. {detail}"
                     st.markdown(answer)
                 st.session_state.chat.append({"role": "assistant", "content": answer})
 
