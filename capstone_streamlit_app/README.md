@@ -11,7 +11,8 @@ Neural Network (MLP) are trained to assign new titles to a persona. The
 ```bash
 cd capstone_streamlit_app
 python3 -m pip install -r requirements.txt
-python3 train_models.py      # builds models/*.joblib (run again after changing the data or pipeline)
+python3 train_models.py      # builds models/*.joblib + feature_importance.json
+cp .streamlit/secrets.toml.example .streamlit/secrets.toml   # then paste your LLM API key
 streamlit run app.py
 ```
 
@@ -19,14 +20,29 @@ streamlit run app.py
 
 ```
 capstone_streamlit_app/
-├── app.py                 # 4-tab dashboard, loads the .joblib models (no training)
+├── app.py                 # 4 tabs + AI Assistant tab, loads the .joblib models (no training)
+├── llm_assistant.py       # LLM chatbot grounded in the app's data, metrics and live What-If decision
 ├── pipeline.py            # shared cleaning + feature engineering
 ├── train_models.py        # trains and saves the models + benchmark metrics
 ├── data/                  # HBO_MAX_Content_extended.csv, People_Dataset.csv
 ├── models/                # kmeans, scaler, decision tree, logistic, ANN (.joblib) + metrics
 ├── .streamlit/config.toml # dark theme
+├── .streamlit/secrets.toml.example  # LLM provider settings (copy to secrets.toml, never commit it)
 └── requirements.txt
 ```
 
 The features and K-Means settings are the same as `src/movie_viewer_clusters.py`,
 so the six clusters match the Milestone 2 personas exactly.
+
+## AI Assistant (LLM chatbot)
+
+Tab 5 answers questions about data patterns, feature importance rankings and the live
+What-If decision. On every question the app sends the LLM a fact sheet built from its own
+data (persona profiles, benchmark metrics, permutation importance, Logistic Regression
+coefficients, the current What-If inputs and probabilities, and any catalog movie named in the
+question). The model is told to answer only from those facts; the expander under the chat shows
+exactly what it sees.
+
+Providers: Claude (Anthropic) or any OpenAI-compatible API (OpenAI, Google Gemini, Groq,
+OpenRouter, local Ollama). Settings go in `.streamlit/secrets.toml` (see the `.example` file).
+`secrets.toml` is git-ignored, so API keys never reach GitHub.
