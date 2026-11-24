@@ -22,13 +22,15 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (accuracy_score, adjusted_rand_score, f1_score,
                              precision_score, recall_score, roc_auc_score,
                              silhouette_score)
+from sklearn.inspection import permutation_importance
 from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier
 
-from pipeline import (K, MODELS_DIR, NUMERIC_FEATURES, RANDOM_STATE,
-                      VIEWER_PERSONAS, build_features, load_raw, scale_features)
+from pipeline import (AWARD_CALIBER_PERSONA, K, MODELS_DIR, NUMERIC_FEATURES,
+                      RANDOM_STATE, VIEWER_PERSONAS, build_features, load_raw,
+                      scale_features)
 
 MODELS_DIR.mkdir(exist_ok=True)
 
@@ -88,6 +90,29 @@ for name, model in models.items():
     joblib.dump(model, MODELS_DIR / files[name])
     print(f"{name}: test acc={rows[-1]['Test Accuracy']:.3f}  F1={rows[-1]['F1 (macro)']:.3f}  "
           f"AUC={rows[-1]['ROC-AUC (OvR)']:.3f}  CV F1={cv_f1.mean():.3f}")
+
+# 3b. Feature importance ----------------------------------------------------
+# Permutation importance on the held-out test set: how much macro F1 drops when
+# one feature is shuffled. Model-agnostic, so the 3 classifiers are comparable.
+importance = {"permutation_f1_drop": {}, "award_caliber_logit_coef": {}}
+for name, model in models.items():
+    pi = permutation_importance(model, X_test, y_test, scoring="f1_macro",
+                                n_repeats=10, random_state=RANDOM_STATE)
+    importance["permutation_f1_drop"][name] = {
+        col: float(v) for col, v in zip(X_test.columns, pi.importances_mean)}
+
+# Logistic Regression coefficients for the Award Caliber persona (cluster 5):
+# positive = pushes a title INTO the carousel, negative = keeps it out.
+award_id = [k for k, v in VIEWER_PERSONAS.items() if v == AWARD_CALIBER_PERSONA][0]
+lr = models["Logistic Regression"]
+importance["award_caliber_logit_coef"] = {
+    col: float(c) for col, c in zip(X_scaled.columns, lr.coef_[award_id])}
+print("Top features (ANN, permutation):",
+      sorted(importance["permutation_f1_drop"]["Neural Network (MLP)"].items(),
+             key=lambda kv: -kv[1])[:5])
+
+with open(MODELS_DIR / "feature_importance.json", "w") as f:
+    json.dump(importance, f, indent=2)
 
 # 4. Save artifacts ---------------------------------------------------------
 joblib.dump(scaler, MODELS_DIR / "standard_scaler.joblib")

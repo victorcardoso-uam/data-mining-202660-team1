@@ -18,6 +18,8 @@ import streamlit as st
 from sklearn.decomposition import PCA
 from sklearn.metrics import confusion_matrix, roc_curve, roc_auc_score
 
+import llm_assistant as ai
+
 from pipeline import (AWARD_CALIBER_PERSONA, MODELS_DIR, NUMERIC_FEATURES,
                       PERSONA_POLICY, RATING_MAP, VIEWER_PERSONAS, build_features,
                       load_raw, scale_features, scenario_to_features)
@@ -73,12 +75,14 @@ def load_artifacts():
                    for name, fname in meta["model_files"].items()}
     with open(MODELS_DIR / "benchmark_metrics.json") as f:
         metrics = json.load(f)
-    return meta, scaler, kmeans, classifiers, metrics
+    with open(MODELS_DIR / "feature_importance.json") as f:
+        importance = json.load(f)
+    return meta, scaler, kmeans, classifiers, metrics, importance
 
 
 try:
     raw_movies, movies, X, genre_cols, params = load_data()
-    meta, scaler, kmeans, classifiers, metrics = load_artifacts()
+    meta, scaler, kmeans, classifiers, metrics, importance = load_artifacts()
 except FileNotFoundError as e:
     st.error(f"Missing file: {e.filename}. Run `python train_models.py` inside "
              "capstone_streamlit_app/ first, then reload this page.")
@@ -142,6 +146,14 @@ st.sidebar.markdown(
     "**Supervised:** Decision Tree · Logistic Regression · ANN (MLP)  \n"
     "**Data:** HBO Max movie catalog + People awards dataset")
 
+llm_cfg = ai.get_config(st.secrets)
+st.sidebar.divider()
+st.sidebar.subheader("💬 AI Assistant")
+if ai.is_ready(llm_cfg):
+    st.sidebar.success(f"Connected · {llm_cfg['model']}")
+else:
+    st.sidebar.warning("No LLM key set. See the AI Assistant tab.")
+
 active_model = classifiers[model_name]
 active_row = perf_df[perf_df["Model"] == model_name].iloc[0]
 
@@ -167,11 +179,12 @@ k4.metric("Active model test F1", f"{active_row['F1 (macro)']:.3f}",
 
 st.divider()
 
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📊 Data Explorer & EDA",
     "⚙️ Preprocessing & Correlation",
     "🤖 Multi-Model Benchmark",
     "🔮 Real-Time What-If Inference",
+    "💬 AI Assistant",
 ])
 
 # -----------------------------------------------------------------------------
@@ -328,6 +341,42 @@ with tab3:
                    f"ended training {len(epochs) - best_ep} epochs later, so the saved weights are "
                    "not overfitted.")
 
+    st.subheader("Feature importance ranking")
+    fi1, fi2 = st.columns(2)
+    with fi1:
+        perm = importance["permutation_f1_drop"][model_name]
+        fi_df = (pd.DataFrame({"Feature": [ai.label(c) for c in perm], "F1 drop": list(perm.values())})
+                 .sort_values("F1 drop", ascending=False).head(10).iloc[::-1])
+        fig = px.bar(fi_df, x="F1 drop", y="Feature", orientation="h", text_auto=".3f",
+                     color_discrete_sequence=["#A78BFA"],
+                     title=f"{model_name}: permutation importance (test set)")
+        fig.update_layout(**PLOT_LAYOUT, height=420, yaxis_title=None,
+                          xaxis_title="Drop in macro F1 when the feature is shuffled")
+        st.plotly_chart(fig, width="stretch")
+        st.caption("Shuffling a feature breaks its link to the persona; the bigger the F1 drop, "
+                   "the more the model relies on it. Follows the active model in the sidebar.")
+    with fi2:
+        coef = importance["award_caliber_logit_coef"]
+        ranked = sorted(coef.items(), key=lambda kv: -kv[1])
+        top = ranked[:6] + ranked[-4:]  # 6 strongest pushes in, 4 strongest pushes out
+        co_df = (pd.DataFrame({"Feature": [ai.label(c) for c, _ in top],
+                               "Coefficient": [v for _, v in top]})
+                 .sort_values("Coefficient"))
+        co_df["Direction"] = np.where(co_df["Coefficient"] > 0, "Into the carousel", "Out of the carousel")
+        fig = px.bar(co_df, x="Coefficient", y="Feature", orientation="h", color="Direction",
+                     text_auto="+.2f", color_discrete_map={"Into the carousel": "#A78BFA",
+                                                           "Out of the carousel": "#6B7280"},
+                     title="What drives the Award Caliber decision (Logistic Regression)")
+        fig.update_traces(textposition="outside", cliponaxis=False)
+        fig.update_xaxes(range=[min(co_df["Coefficient"].min() * 1.6, -0.6),
+                                co_df["Coefficient"].max() * 1.2])
+        fig.update_layout(**PLOT_LAYOUT, height=420, yaxis_title=None, legend_title_text=None,
+                          xaxis_title="Coefficient on standardized feature (log-odds)",
+                          legend=dict(orientation="h", y=-0.2))
+        st.plotly_chart(fig, width="stretch")
+        st.caption("Awards won by the title are by far the strongest push into the Award Caliber "
+                   "persona, followed by director awards and Rotten Tomatoes score.")
+
     st.subheader("Persona map (PCA projection of the K-Means clusters)")
     pca = PCA(n_components=2, random_state=42)
     coords = pca.fit_transform(X_scaled)
@@ -415,3 +464,98 @@ with tab4:
         st.write("**Scenario log (this session)**")
         st.dataframe(pd.DataFrame(st.session_state.scenario_log), hide_index=True,
                      width="stretch")
+
+# Live What-If state handed to the AI Assistant (Tab 5)
+scenario = {
+    "imdb": imdb, "rotten": rotten, "year": year, "rating": rating, "genres": genres,
+    "title_aw": title_aw, "director_aw": director_aw, "actor_aw": actor_aw, "platforms": platforms,
+    "model": model_name, "threshold": threshold, "probs": probs, "persona": pred_persona,
+    "award_prob": award_prob, "scaled_row": feat_scaled.iloc[0].to_dict(),
+}
+
+
+# -----------------------------------------------------------------------------
+# TAB 5: AI ASSISTANT (LLM chatbot grounded in the app's data and models)
+# -----------------------------------------------------------------------------
+@st.cache_data
+def static_facts(_movies, raw_count, _perf_df, _kmeans_metrics, _importance):
+    with_genres = _movies.join(X[genre_cols])  # multi-hot genre columns live in X
+    return ai.build_static_context(with_genres, raw_count, _perf_df, _kmeans_metrics, _importance,
+                                   PERSONA_ORDER, genre_cols, PERSONA_POLICY, AWARD_CALIBER_PERSONA,
+                                   raw_movie_rows=raw_movies, params=params, classifiers=classifiers)
+
+
+def award_prob_for_movie(idx):
+    row = X_scaled.loc[[idx]]
+    return float(active_model.predict_proba(row)[0][PERSONA_ORDER.index(AWARD_CALIBER_PERSONA)])
+
+
+def award_prob_for_scenario(**overrides):
+    """Re-run the active model on the What-If inputs with some sliders changed."""
+    v = {k: scenario[k] for k in ["imdb", "rotten", "year", "rating", "genres",
+                                  "title_aw", "actor_aw", "director_aw", "platforms"]}
+    v.update(overrides)
+    row = scale_features(scenario_to_features(v["imdb"], v["rotten"], v["year"], v["rating"],
+                                              v["genres"], v["title_aw"], v["actor_aw"],
+                                              v["director_aw"], v["platforms"], genre_cols),
+                         scaler, genre_cols)
+    return float(active_model.predict_proba(row)[0][PERSONA_ORDER.index(AWARD_CALIBER_PERSONA)])
+
+
+def all_facts(question=""):
+    return "\n\n".join(filter(None, [
+        static_facts(movies, len(raw_movies), perf_df, metrics["kmeans"], importance),
+        ai.scenario_context(scenario, importance["award_caliber_logit_coef"], PERSONA_ORDER,
+                            award_prob_for_scenario),
+        ai.movie_lookup(question, movies, award_prob_for_movie) if question else "",
+    ]))
+
+
+if "chat" not in st.session_state:
+    st.session_state.chat = []
+
+with tab5:
+    st.subheader("💬 PrestigePick AI Assistant")
+    st.write("Ask about the dataset, the models and their metrics, advice for your current What-If "
+             "scenario, or limitations and biases. Answers use only this app's data, metrics and "
+             "loaded models.")
+
+    if not ai.is_ready(llm_cfg):
+        st.warning("The assistant needs an LLM API key. Create `.streamlit/secrets.toml` from "
+                   "`.streamlit/secrets.toml.example`, add your key, and restart the app.")
+    else:
+        sq = st.columns(len(ai.suggested_questions()))
+        picked = None
+        for col, q in zip(sq, ai.suggested_questions()):
+            if col.button(q, width="stretch", key=f"sq_{q}"):
+                picked = q
+
+        chat_box = st.container(height=480)
+        question = st.chat_input("Ask the assistant…") or picked
+        with chat_box:
+            for msg in st.session_state.chat:
+                with st.chat_message(msg["role"]):
+                    st.markdown(msg["content"])
+
+            if question:
+                st.session_state.chat.append({"role": "user", "content": question})
+                with st.chat_message("user"):
+                    st.markdown(question)
+                facts = all_facts(question)
+                with st.chat_message("assistant"):
+                    with st.spinner("Thinking…"):
+                        try:
+                            answer = ai.ask_llm(llm_cfg, ai.SYSTEM_PROMPT.format(facts=facts),
+                                                st.session_state.chat[-10:])
+                        except Exception as e:
+                            answer = f"⚠️ The assistant could not reach the LLM ({type(e).__name__}). " \
+                                     "Check the API key and internet connection."
+                    st.markdown(answer)
+                st.session_state.chat.append({"role": "assistant", "content": answer})
+
+        c1, c2 = st.columns([1, 4])
+        if c1.button("🗑️ Clear chat"):
+            st.session_state.chat = []
+            st.rerun()
+        with c2.expander("What does the assistant see? (grounding facts)"):
+            st.code(all_facts(), language="markdown")
