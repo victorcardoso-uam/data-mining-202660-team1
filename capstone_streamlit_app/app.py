@@ -548,8 +548,10 @@ with tab5:
                             answer = ai.ask_llm(llm_cfg, ai.SYSTEM_PROMPT.format(facts=facts),
                                                 st.session_state.chat[-10:])
                         except Exception as e:
-                            answer = f"⚠️ The assistant could not reach the LLM ({type(e).__name__}). " \
-                                     "Check the API key and internet connection."
+                            resp = getattr(e, "response", None)
+                            detail = (f"HTTP {resp.status_code}: {resp.text[:300]}" if resp is not None
+                                      else type(e).__name__)
+                            answer = f"⚠️ The assistant could not reach the LLM. {detail}"
                     st.markdown(answer)
                 st.session_state.chat.append({"role": "assistant", "content": answer})
 
