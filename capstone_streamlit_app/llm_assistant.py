@@ -49,14 +49,34 @@ def _as_list(v):
     return [x.strip() for x in str(v or "").split(",") if x.strip()]
 
 
+def _local_secrets():
+    """The secrets.toml next to this file, so the key is found even when Streamlit is started
+    from another folder (Streamlit itself only looks in the folder it was launched from)."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".streamlit", "secrets.toml")
+    if not os.path.exists(path):
+        return {}
+    try:
+        import tomllib
+        with open(path, "rb") as f:
+            return tomllib.load(f)
+    except Exception:  # Python < 3.11 or a formatting problem: simple KEY = "value" lines
+        with open(path, encoding="utf-8") as f:
+            return dict(re.findall(r'^\s*([A-Z_]+)\s*=\s*"(.*)"\s*$', f.read(), re.M))
+
+
 def get_config(secrets):
-    """Read provider settings from st.secrets first, then environment variables."""
+    """Read provider settings from st.secrets, then the app's own secrets.toml, then
+    environment variables."""
+    local = _local_secrets()
+
     def get(key, default=None):
         try:
             if key in secrets:
                 return secrets[key]
-        except Exception:  # no secrets.toml at all
+        except Exception:  # Streamlit found no secrets.toml where it was launched
             pass
+        if key in local:
+            return local[key]
         return os.environ.get(key, default)
 
     provider = (get("LLM_PROVIDER") or ("anthropic" if get("ANTHROPIC_API_KEY") else
