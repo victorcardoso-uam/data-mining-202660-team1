@@ -530,28 +530,42 @@ with tab5:
             for msg in st.session_state.chat:
                 with st.chat_message(msg["role"]):
                     st.markdown(msg["content"])
+                    if msg.get("used"):
+                        st.caption(msg["used"])
 
             if question:
                 st.session_state.chat.append({"role": "user", "content": question})
                 with st.chat_message("user"):
                     st.markdown(question)
                 facts = all_facts(question)
+                tools = ai.CatalogTools(
+                    movies, X_scaled, genre_cols, active_model, model_name, scaler, threshold,
+                    PERSONA_ORDER, AWARD_CALIBER_PERSONA, PERSONA_POLICY, scenario_to_features,
+                    scale_features, (params["rotten_slope"], params["rotten_intercept"]))
+                trace = []
                 with st.chat_message("assistant"):
                     with st.spinner("Thinking…"):
                         try:
+                            history = [{"role": m["role"], "content": m["content"]}
+                                       for m in st.session_state.chat[-10:]]
                             answer = ai.ask_llm(llm_cfg, ai.SYSTEM_PROMPT.format(facts=facts),
-                                                st.session_state.chat[-10:])
+                                                history, tools=ai.TOOLS, run_tool=tools.run,
+                                                trace=trace)
                         except Exception as e:
                             resp = getattr(e, "response", None)
-                            if resp is not None and resp.status_code in ai.RETRYABLE:
+                            if (resp is not None and resp.status_code in ai.RETRYABLE) or \
+                                    type(e).__name__ in ("Timeout", "ReadTimeout", "ConnectTimeout", "TimeoutError"):
                                 answer = ("⏳ The AI model is busy right now (the provider is overloaded). "
                                           "I retried a few times; please ask again in a minute.")
                             else:
                                 detail = (f"HTTP {resp.status_code}: {resp.text[:300]}" if resp is not None
-                                          else type(e).__name__)
+                                          else f"{type(e).__name__}: {e}")
                                 answer = f"⚠️ The assistant could not reach the LLM. {detail}"
                     st.markdown(answer)
-                st.session_state.chat.append({"role": "assistant", "content": answer})
+                    used = ai.describe_trace(trace)
+                    if used:
+                        st.caption(used)
+                st.session_state.chat.append({"role": "assistant", "content": answer, "used": used})
 
         c1, c2 = st.columns([1, 4])
         if c1.button("🗑️ Clear chat"):
