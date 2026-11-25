@@ -91,6 +91,7 @@ except FileNotFoundError as e:
 X_scaled = scale_features(X, scaler, genre_cols)
 movies["cluster"] = kmeans.predict(X_scaled)
 movies["viewer_profile"] = movies["cluster"].map(VIEWER_PERSONAS)
+TRAIN_RANGES = ai.training_ranges(movies)  # what the models saw in training
 X_test = X_scaled.loc[meta["test_index"]]
 y_test = movies.loc[meta["test_index"], "cluster"]
 perf_df = pd.DataFrame(metrics["classifiers"])
@@ -418,8 +419,17 @@ with tab4:
     award_prob = float(probs[PERSONA_ORDER.index(AWARD_CALIBER_PERSONA)])
     kmeans_persona = VIEWER_PERSONAS[int(kmeans.predict(feat_scaled)[0])]
 
+    wi_out_of_range = ai.out_of_range(
+        {"imdb_score": imdb, "rotten_score": rotten, "year": year, "title_awards": title_aw,
+         "director_awards": director_aw, "actor_awards": actor_aw, "platforms": platforms},
+        TRAIN_RANGES)
+
     with right:
         st.markdown(f"##### 🎯 Live inference · {model_name}")
+        if wi_out_of_range:
+            st.warning("⚠️ Outside the training data: " + "; ".join(wi_out_of_range)
+                       + ". The model is extrapolating, so treat this prediction as indicative "
+                         "and send the title to human review.")
         st.markdown(f"**Award Caliber probability: {award_prob:.1%}** (cutoff {threshold:.2f})")
         st.progress(award_prob)
 
@@ -465,6 +475,7 @@ scenario = {
     "title_aw": title_aw, "director_aw": director_aw, "actor_aw": actor_aw, "platforms": platforms,
     "model": model_name, "threshold": threshold, "probs": probs, "persona": pred_persona,
     "award_prob": award_prob, "scaled_row": feat_scaled.iloc[0].to_dict(),
+    "out_of_range": wi_out_of_range,
 }
 
 
@@ -525,7 +536,8 @@ with tab5:
                 picked = q
 
         chat_box = st.container(height=480)
-        question = st.chat_input("Ask the assistant…") or picked
+        question = ai.clean_question(st.chat_input("Ask the assistant…",
+                                                   max_chars=ai.MAX_QUESTION_CHARS) or picked)
         with chat_box:
             for msg in st.session_state.chat:
                 with st.chat_message(msg["role"]):
@@ -545,15 +557,20 @@ with tab5:
                 trace = []
                 with st.chat_message("assistant"):
                     with st.spinner("Thinking…"):
+                        llm_ok = False
                         try:
                             history = [{"role": m["role"], "content": m["content"]}
                                        for m in st.session_state.chat[-10:]]
                             answer = ai.ask_llm(llm_cfg, ai.SYSTEM_PROMPT.format(facts=facts),
                                                 history, tools=ai.TOOLS, run_tool=tools.run,
                                                 trace=trace)
+                            llm_ok = True
                         except Exception as e:
                             resp = getattr(e, "response", None)
-                            if (resp is not None and resp.status_code in ai.RETRYABLE) or \
+                            fallback = ai.offline_answer(question, tools)
+                            if fallback:
+                                answer = fallback
+                            elif (resp is not None and resp.status_code in ai.RETRYABLE) or \
                                     type(e).__name__ in ("Timeout", "ReadTimeout", "ConnectTimeout", "TimeoutError"):
                                 answer = ("⏳ The AI model is busy right now (the provider is overloaded). "
                                           "I retried a few times; please ask again in a minute.")
@@ -562,7 +579,18 @@ with tab5:
                                           else f"{type(e).__name__}: {e}")
                                 answer = f"⚠️ The assistant could not reach the LLM. {detail}"
                     st.markdown(answer)
-                    used = ai.describe_trace(trace)
+                    notes = [ai.describe_trace(trace)]
+                    if llm_ok:
+                        checked, unverified = ai.fact_check(
+                            answer, [facts, question] + [t["output"] for t in trace]
+                            + [m["content"] for m in st.session_state.chat if m["role"] == "user"])
+                        if unverified:
+                            notes.append("⚠️ Not found in the app's data, double-check: "
+                                         + ", ".join(unverified))
+                        elif checked:
+                            notes.append(f"✅ {checked} number{'s' if checked > 1 else ''} "
+                                         "verified against the app's data")
+                    used = "  \n".join(n for n in notes if n)
                     if used:
                         st.caption(used)
                 st.session_state.chat.append({"role": "assistant", "content": answer, "used": used})

@@ -46,3 +46,25 @@ exactly what it sees.
 Providers: Claude (Anthropic) or any OpenAI-compatible API (OpenAI, Google Gemini, Groq,
 OpenRouter, local Ollama). Settings go in `.streamlit/secrets.toml` (see the `.example` file).
 `secrets.toml` is git-ignored, so API keys never reach GitHub.
+
+## Reliability and safety of the AI Assistant
+
+| Risk | Protection |
+|---|---|
+| Prompt injection, role play, requests to reveal the prompt or keys | Guardrail rules in the system prompt; tool outputs and user text are treated as data, not instructions; API keys never reach the model |
+| Off-topic questions | The assistant only answers about PrestigePick |
+| False premises ("why did the ANN win?") | The assistant corrects the premise from the facts first |
+| Invented numbers | Every number in an answer is checked against the app's data; the result is shown under the answer (✅ verified / ⚠️ double-check) |
+| Impossible inputs (IMDb 15, year 3000) | The classifier tool refuses to run |
+| Inputs outside the training data | Tab 4 and the assistant warn that the prediction is an extrapolation and recommend human review |
+| Busy or slow LLM provider | Retries, backup models, 60 s limit; movie questions are still answered straight from the data |
+| Very long inputs | Questions are capped at 800 characters; temperature 0 for repeatable answers |
+
+### Tests
+
+```bash
+cd capstone_streamlit_app
+python3 -m pip install pytest
+python3 -m pytest tests -q          # 37 offline tests: tools, validation, fact-check (no key needed)
+python3 tests/red_team.py           # 15 adversarial questions against the real LLM -> tests/red_team_report.md
+```
