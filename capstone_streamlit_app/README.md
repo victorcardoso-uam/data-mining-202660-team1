@@ -21,6 +21,7 @@ streamlit run app.py
 ```
 capstone_streamlit_app/
 ├── app.py                 # 4 tabs + AI Assistant tab, loads the .joblib models (no training)
+├── app_session24_demo.py  # Activity 20 Session 24 template, kept for grading (NOT part of the final app)
 ├── llm_assistant.py       # LLM chatbot grounded in the app's data, metrics and live What-If decision
 ├── pipeline.py            # shared cleaning + feature engineering
 ├── train_models.py        # trains and saves the models + benchmark metrics
