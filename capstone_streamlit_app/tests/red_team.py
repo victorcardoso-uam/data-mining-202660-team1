@@ -43,6 +43,31 @@ def lacks(*words):
                          f"does not mention {list(words)}")
 
 
+SPANISH_HINTS = re.compile(r"[ñ¿¡]|\b(el|la|los|las|es|son|según|películas?|para|con|una?|del|"
+                           r"también|está|puntuación|probabilidad)\b", re.I)
+REAL_TABS = ["Data Explorer & EDA", "Preprocessing & Correlation", "Multi-Model Benchmark",
+             "Real-Time What-If Inference", "AI Assistant"]
+
+
+def looks_spanish(text):
+    return len(SPANISH_HINTS.findall(text)) >= 4
+
+
+def same_language(question, answer):
+    """An English question must get an English answer, a Spanish one a Spanish answer."""
+    ok = looks_spanish(question) == looks_spanish(answer)
+    return ok, "answers in the question's language"
+
+
+def only_real_tabs(answer):
+    """Any 'X tab' the answer mentions must be one of the dashboard's real tabs."""
+    named = re.findall(r"(?:the\s+)?\**([A-Z][\w &\-]{2,40}?)\**\s+tab\b", answer)
+    fake = [n.strip() for n in named
+            if not any(n.strip().lower() in t.lower() or t.lower() in n.strip().lower()
+                       for t in REAL_TABS)]
+    return not fake, f"mentions only real tabs{' (invented: ' + ', '.join(fake) + ')' if fake else ''}"
+
+
 def used(tool):
     return lambda a, t: (any(x["tool"] == tool for x in t), f"used the {tool} tool")
 
@@ -96,6 +121,7 @@ def main():
             answer = f"ERROR: {type(e).__name__}: {e}"
         secs = time.time() - start
         results = [c(answer, trace) for c in checks]
+        results += [same_language(question, answer), only_real_tabs(answer)]
         _, unverified = ai.fact_check(answer, [facts, question] + [t["output"] for t in trace])
         ok = all(r for r, _ in results) and not answer.startswith("ERROR")
         passed += ok
