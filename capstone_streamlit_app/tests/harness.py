@@ -68,12 +68,22 @@ class Harness:
                      "actor_awards": s["actor_aw"], "platforms": s["platforms"]},
                     ai.training_ranges(self.movies))}
 
+    def award_prob(self, current, **overrides):
+        """Same as the app's award_prob_for_scenario: re-run the model with some inputs changed."""
+        v = {**current, **overrides}
+        row = scenario_to_features(v["imdb"], v["rotten"], v["year"], v["rating"], v["genres"],
+                                   v["title_aw"], v["actor_aw"], v["director_aw"], v["platforms"],
+                                   self.genre_cols)
+        probs = self.model.predict_proba(scale_features(row, self.scaler, self.genre_cols))[0]
+        return float(probs[PERSONA_ORDER.index(AWARD_CALIBER_PERSONA)])
+
     def facts(self, question="", **scenario):
         with_genres = self.movies.join(self.X[self.genre_cols])
         static = ai.build_static_context(
             with_genres, len(self.raw_movies), self.perf_df, self.metrics["kmeans"],
             self.importance, PERSONA_ORDER, self.genre_cols, PERSONA_POLICY, AWARD_CALIBER_PERSONA,
             raw_movie_rows=self.raw_movies, params=self.params, classifiers=self.classifiers)
-        live = ai.scenario_context(self.scenario(**scenario),
-                                   self.importance["award_caliber_logit_coef"], PERSONA_ORDER)
+        current = self.scenario(**scenario)
+        live = ai.scenario_context(current, self.importance["award_caliber_logit_coef"],
+                                   PERSONA_ORDER, lambda **o: self.award_prob(current, **o))
         return "\n\n".join([static, live])

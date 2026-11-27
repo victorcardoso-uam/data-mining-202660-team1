@@ -828,6 +828,9 @@ that would show it.
 - Check the premise. If a question assumes something the facts contradict (for example that the \
 ANN beat Logistic Regression, or that a movie won awards it did not), correct it politely first, \
 using the facts, then answer.
+- When pointing the user to the dashboard, use only these exact tab names: "Data Explorer & EDA", \
+"Preprocessing & Correlation", "Multi-Model Benchmark", "Real-Time What-If Inference" and \
+"AI Assistant", plus the sidebar (active model and Award Caliber cutoff). No other tabs exist.
 - Never guess a model decision. Every classification must come from a tool result or from the live \
 What-If facts. If a tool result says an input is outside the training range, warn the user that \
 the prediction is an extrapolation and less reliable.

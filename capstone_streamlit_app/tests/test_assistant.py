@@ -155,3 +155,13 @@ def test_facts_contain_key_numbers(h):
     f = h.facts()
     for n in ["1572", "0.96", "0.937", "0.130"]:
         assert n in f
+
+
+def test_system_prompt_lists_the_real_tabs():
+    for tab in ["Data Explorer & EDA", "Preprocessing & Correlation", "Multi-Model Benchmark",
+                "Real-Time What-If Inference", "AI Assistant"]:
+        assert tab in ai.SYSTEM_PROMPT
+
+
+def test_facts_include_flip_advice(h):
+    assert "Smallest single-slider change" in h.facts()
